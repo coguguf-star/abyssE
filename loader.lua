@@ -1,34 +1,51 @@
--- loader.lua
-if not game:IsLoaded() then
-    game.Loaded:Wait()
-end
+-- ============================================
+-- AbyssE Loader
+-- repo : coguguf-star/AbyssE
+-- ============================================
 
-local BASE = "https://raw.githubusercontent.com/coguguf-star/felixi/main/games/"
+local BASE = "https://raw.githubusercontent.com/coguguf-star/AbyssE/main/games/"
 
-local places = {
-    [93387271767638] = "menu.lua",   -- Abyss Expedition
-    -- kalau mau nambah game lain, tambahin di sini:
-    -- [PLACEID] = "namafile.lua",
+-- PlaceId game yang didukung
+local GAMES = {
+    [93387271767638] = "abyss",   -- Abyss Expedition
 }
 
-local file = places[game.PlaceId]
+-- biar menu.lua & file lain bisa baca BASE yang sama
+getgenv().ABYSS_BASE = BASE
 
-if file then
-    task.wait(math.random() * 0.5)
-    local ok, err = pcall(function()
-        loadstring(game:HttpGet(BASE .. file))()
+local function fetch(name)
+    local url = BASE .. name .. ".lua?v=" .. tostring(os.time())
+    local ok, src = pcall(function()
+        return game:HttpGet(url)
     end)
-    if not ok then
-        local gui = Instance.new("ScreenGui", game:GetService("CoreGui"))
-        local l = Instance.new("TextLabel", gui)
-        l.Size = UDim2.new(0, 340, 0, 130)
-        l.Position = UDim2.new(0, 8, 0, 200)
-        l.BackgroundColor3 = Color3.fromRGB(120, 30, 30)
-        l.TextColor3 = Color3.new(1, 1, 1)
-        l.TextWrapped = true
-        l.TextSize = 11
-        l.TextXAlignment = Enum.TextXAlignment.Left
-        l.TextYAlignment = Enum.TextYAlignment.Top
-        l.Text = "LOADER ERROR:\n" .. tostring(err)
+    if not ok or not src or #src < 5 then
+        warn("[AbyssE] gagal ambil: " .. url)
+        return nil
     end
+    return src
+end
+
+local function run(name)
+    local src = fetch(name)
+    if not src then return end
+    local f, err = loadstring(src)
+    if not f then
+        warn("[AbyssE] syntax error di " .. name .. ": " .. tostring(err))
+        return
+    end
+    local ok, err2 = pcall(f)
+    if not ok then
+        warn("[AbyssE] runtime error di " .. name .. ": " .. tostring(err2))
+    end
+end
+
+-- 1) Menu selalu di-load duluan
+run("menu")
+
+-- 2) Baru file game sesuai PlaceId
+local target = GAMES[game.PlaceId]
+if target then
+    run(target)
+else
+    warn("[AbyssE] PlaceId " .. tostring(game.PlaceId) .. " belum didukung")
 end

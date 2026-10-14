@@ -1,5 +1,5 @@
 -- ============================================
--- AbyssE - menu.lua
+-- AbyssE - menu.lua  (FINAL)
 -- Menu draggable + animasi + server hop
 -- ============================================
 
@@ -40,10 +40,10 @@ end
 local function addPress(btn)
     local s = mk("UIScale", {}, btn)
     btn.MouseButton1Down:Connect(function()
-        Tween:Create(s, TweenInfo.new(0.07), {Scale = 0.94}):Play()
+        Tween:Create(s, TweenInfo.new(0.07), { Scale = 0.94 }):Play()
     end)
     local function back()
-        Tween:Create(s, TweenInfo.new(0.14, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
+        Tween:Create(s, TweenInfo.new(0.14, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
     end
     btn.MouseButton1Up:Connect(back)
     btn.MouseLeave:Connect(back)
@@ -201,16 +201,20 @@ local mini = mk("TextButton", {
 }, gui)
 mk("UICorner", { CornerRadius = UDim.new(0, 14) }, mini)
 local miniScale = mk("UIScale", { Scale = 1 }, mini)
+
+-- FIX: forward declare dulu, baru dipakai di closure bawah
+local openMain, closeMain
+
 makeDraggable(mini, mini, function() openMain() end)
 
-local function openMain()
+function openMain()
     mini.Visible = false
     main.Visible = true
     mainScale.Scale = 0.72
     Tween:Create(mainScale, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
 end
 
-local function closeMain()
+function closeMain()
     Tween:Create(mainScale, TweenInfo.new(0.16, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Scale = 0 }):Play()
     task.delay(0.17, function()
         if mainScale.Scale < 0.1 then
@@ -223,7 +227,7 @@ local function closeMain()
 end
 
 minBtn.MouseButton1Click:Connect(closeMain)
-hideBtn.MouseButton1Click:Connect(function() gui.Enabled = false end)
+hideBtn.MouseButton1Click:Connect(closeMain)
 
 -- ================= TAB: PROFIL =================
 local prof = addTab("PROFIL")
@@ -290,7 +294,7 @@ task.spawn(function()
     end
 end)
 
--- ================= HELPER: MODUL =================
+-- ================= HELPER =================
 local function ensureModule(file, key)
     local m = getgenv()[key]
     if m and m.loaded then return m end
@@ -390,7 +394,7 @@ local function makeToggle(parent, y, text, onChanged)
     return btn, function(v) state = v; paint() end
 end
 
--- ================= TAB: AUTO TRIP =================
+-- ================= TAB: TRIP =================
 local trip = addTab("TRIP")
 local tripScroll = mk("ScrollingFrame", {
     Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
@@ -406,16 +410,16 @@ fullBtn(tripScroll, 52, "LANJUT (lewat tali)", function()
 end)
 
 sectionLabel(tripScroll, 96, "CATATAN")
-mk("TextLabel", {
+local tripNote = mk("TextLabel", {
     Size = UDim2.new(1, -10, 0, 130), Position = UDim2.new(0, 5, 0, 118),
     BackgroundColor3 = C.panel, BorderSizePixel = 0, TextWrapped = true,
     Text = "  Modul jalan sendiri ngikutin jalur rekaman.\n  Pas nyampe tali, snake mati & nunggu lu pakai tali manual (hold 0.5-1 dtk).\n  Kalau lu udah turun, tekan LANJUT.\n\n  Kalau mati, dia otomatis mulai dari titik terdekat.",
     Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = C.dim,
     TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
 }, tripScroll)
-mk("UICorner", { CornerRadius = UDim.new(0, 8) }, tripScroll:GetChildren()[#tripScroll:GetChildren()])
+mk("UICorner", { CornerRadius = UDim.new(0, 8) }, tripNote)
 
--- ================= TAB: LAYER 4 =================
+-- ================= TAB: LAYER4 =================
 local l4 = addTab("LAYER4")
 local l4Scroll = mk("ScrollingFrame", {
     Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
@@ -438,8 +442,8 @@ halfBtn(l4Scroll, 1, 98,  "MODE WALK",   function() callL4("setWalk")   end)
 halfBtn(l4Scroll, 0, 134, "MODE FREEZE", function() callL4("setFreeze") end)
 
 sectionLabel(l4Scroll, 176, "PINDAH POSISI")
-halfBtn(l4Scroll, 0, 196, "TURUN 250",  function() callL4("moveDown") end)
-halfBtn(l4Scroll, 1, 196, "NAIK 250",   function() callL4("moveUp")   end)
+halfBtn(l4Scroll, 0, 196, "TURUN 250",  function() callL4("moveDown")    end)
+halfBtn(l4Scroll, 1, 196, "NAIK 250",   function() callL4("moveUp")      end)
 halfBtn(l4Scroll, 0, 232, "TURUN 1000", function() callL4("moveDownBig") end)
 halfBtn(l4Scroll, 1, 232, "NAIK 1000",  function() callL4("moveUpBig")   end)
 fullBtn(l4Scroll, 274, "BALIK KE POSISI AWAL", function() callL4("goBack") end)

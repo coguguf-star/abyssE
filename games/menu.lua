@@ -8,7 +8,7 @@ local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
 local plr = Players.LocalPlayer
 
-local BASE = "https://raw.githubusercontent.com/coguguf-star/felixi/main/games/"
+local BASE = getgenv().ABYSS_BASE or "https://raw.githubusercontent.com/coguguf-star/AbyssE/main/games/"
 
 local ACCENT = Color3.fromRGB(140, 100, 255)
 local BG     = Color3.fromRGB(18, 18, 24)

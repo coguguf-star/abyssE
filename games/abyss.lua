@@ -1,7 +1,7 @@
 -- ============================================
--- AbyssE - abyss.lua  (modul AUTO TRIP)
--- Basis: AUTO TRIP v17 (logika asli, 100% dipertahankan)
--- Tambahan: API start()/stop() buat toggle menu
+-- AbyssE - abyss.lua
+-- Basis: AUTO TRIP v17 (logika asli, ga diubah)
+-- + API start()/stop() + auto-start kalau ga lewat menu
 -- ============================================
 
 local Players    = game:GetService("Players")
@@ -13,12 +13,12 @@ local M = {}
 M.loaded = true
 getgenv().ABYSS_TRIP = M
 
--- ===== TUNING SNAKE (sama persis kaya v17) =====
+-- ===== TUNING SNAKE (sama kaya v17) =====
 local AMP         = 14
 local NO_FALL     = true
 local MAX_FALL    = 10
 local SNAKE_AKTIF = true
--- ===============================================
+-- ========================================
 
 local running   = false
 local snakeConn = nil
@@ -116,7 +116,7 @@ V(-78.4,-2093.8,-127.7), V(-103.9,-2095.6,-111.7), V(-130.7,-2093.9,-97.7), V(-1
 V(-123.5,-2089.3,-60.3), V(-119.9,-2086.6,-63.1), V(-116.3,-2083.9,-69.2), V(-116.3,-2086.2,-69.2),
 }
 
--- ================== UTIL ==================
+-- ============== UTIL ==============
 local function status(t)
     local hp = (hum and math.floor(hum.Health)) or 0
     LOG(("%s | HP %d"):format(t, hp))
@@ -130,6 +130,7 @@ local function nearRope(p)
 end
 
 local function moveTo(dest)
+    if not hrp or not hrp.Parent then return end
     local from = hrp.Position
     local dist = (dest - from).Magnitude
     local steps = math.max(1, math.ceil(dist / 40))
@@ -142,19 +143,25 @@ local function moveTo(dest)
     end
 end
 
+-- ============== INI YANG KETINGGALAN DI VERSI GUA ==============
+-- Tiap respawn, cari ulang titik terdekat. Kalau ga, idx nyangkut
+-- di titik dalam sementara karakter ada di atas -> moveTo nembus terrain.
 local function refreshChar()
     local c = plr.Character
     if c and c ~= char then
         char = c
-        local r = c:FindFirstChild("HumanoidRootPart")
-        local h = c:FindFirstChildOfClass("Humanoid")
-        if not r or not h then return end
-        hrp, hum = r, h
-        status("respawn terdeteksi")
+        hrp = c:WaitForChild("HumanoidRootPart")
+        hum = c:WaitForChild("Humanoid")
+        local bestD = math.huge
+        for j = 1, #PATH do
+            local d = (PATH[j] - hrp.Position).Magnitude
+            if d < bestD then bestD = d; idx = j end
+        end
+        status("respawn - lanjut dari titik " .. idx)
     end
 end
 
--- ================== SNAKE (anti-stale) ==================
+-- ============== SNAKE ==============
 local function snakeStart()
     if snakeConn or not SNAKE_AKTIF then return end
     snakeConn = RunService.RenderStepped:Connect(function()
@@ -181,13 +188,21 @@ local function snakeStop()
     end
 end
 
--- ================== STEP ==================
+-- ============== STEP ==============
 local idx = 1
 
 local function stepOnce()
     refreshChar()
-    if not hrp or not hum then return end
-    if hum.Health <= 0 then status("MATI di titik " .. idx); return end
+    if not hrp or not hum or not hrp.Parent then return end
+
+    if hum.Health <= 0 then
+        status("MATI di titik " .. idx .. " - tunggu respawn")
+        local t = 0
+        while hum.Health <= 0 and t < 20 and running do
+            task.wait(0.25); t = t + 0.25
+        end
+        return
+    end
 
     local p    = PATH[idx]
     local rope = nearRope(p)
@@ -209,14 +224,15 @@ local function stepOnce()
             local t = 0
             while t < 120 do
                 if not running then return end
+                if not hrp or not hrp.Parent then return end
                 if hum.Health <= 0 then break end
                 if getgenv().ABYSS_SKIP then getgenv().ABYSS_SKIP = false; break end
                 local y = hrp.Position.Y
-                if math.abs(y - lastY) < 0.5 then stable += 0.2 else stable = 0 end
+                if math.abs(y - lastY) < 0.5 then stable = stable + 0.2 else stable = 0 end
                 lastY = y
                 status(("DI TALI (turun %.0f) - pakai tali / LANJUT"):format(startY - y))
                 if (startY - y) > 20 and stable > 1.0 then break end
-                task.wait(0.2); t += 0.2
+                task.wait(0.2); t = t + 0.2
             end
         end
 
@@ -241,10 +257,10 @@ local function stepOnce()
         moveTo(p)
     end
 
-    idx += 1
+    idx = idx + 1
 end
 
--- ================== API ==================
+-- ============== API ==============
 function M.isRunning() return running end
 
 function M.start()
@@ -257,10 +273,11 @@ function M.start()
     hum  = c:FindFirstChildOfClass("Humanoid")
     if not hrp or not hum then status("HumanoidRootPart/Humanoid belum ada."); return end
 
+    while hum.Health <= 0 do task.wait(0.25) end
+
     running = true
     getgenv().ABYSS_SKIP = false
 
-    -- cari titik terdekat
     idx = 1
     local bestD = math.huge
     for j = 1, #PATH do
@@ -282,7 +299,7 @@ function M.start()
             local ok, err = pcall(stepOnce)
             if not ok then
                 status("ERR titik " .. idx .. ": " .. tostring(err))
-                idx += 1
+                idx = idx + 1
             end
             task.wait(0.05)
         end
@@ -304,4 +321,10 @@ function M.stop()
         if h then pcall(function() h.WalkSpeed = 16 end) end
     end
     LOG("[TRIP] OFF - balik ke mode normal Roblox.")
+end
+
+-- kalau di-paste langsung (bukan lewat menu), auto start
+if not getgenv().ABYSS_MENU_GUI then
+    task.wait(1)
+    M.start()
 end

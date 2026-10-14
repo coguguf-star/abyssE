@@ -393,10 +393,10 @@ local l4Btn, setL4Visual = makeToggle(110, "LAYER 4 EXPLORER", function(on)
 end)
 
 local l4Btns = {}
-local function mkBtn(text, y, fn)
+local function mkBtn(text, xScale, y, fn)
     local b = mk("TextButton", {
         Size = UDim2.new(0.5, -8, 0, 32),
-        Position = UDim2.new(0, 5 + (y % 2) * 0.5 * 300, 0, 0),
+        Position = UDim2.new(xScale, xScale == 0 and 5 or 0, 0, y),
         BackgroundColor3 = C.panel,
         Text = text,
         Font = Enum.Font.Gotham,
@@ -406,24 +406,18 @@ local function mkBtn(text, y, fn)
     }, featScroll)
     mk("UICorner", { CornerRadius = UDim.new(0, 8) }, b)
     b.MouseButton1Click:Connect(fn)
-    table.insert(l4Btns, b)
     return b
 end
 
-local function callL4(fn)
-    local m = getgenv().ABYSS_LAYER4
-    if m and m[fn] then m[fn]() end
-end
-
 local rowY = 152
-mkBtn("MODE FLY", 0, function() callL4("setFly") end).Position = UDim2.new(0, 5, 0, rowY)
-mkBtn("MODE WALK", 1, function() callL4("setWalk") end).Position = UDim2.new(0.5, 0, 0, rowY)
+mkBtn("MODE FLY",    0, rowY, function() callL4("setFly")    end)
+mkBtn("MODE WALK",   1, rowY, function() callL4("setWalk")   end)
 rowY = rowY + 38
-mkBtn("MODE FREEZE", 0, function() callL4("setFreeze") end).Position = UDim2.new(0, 5, 0, rowY)
-mkBtn("TURUN 250", 1, function() callL4("moveDown") end).Position = UDim2.new(0.5, 0, 0, rowY)
+mkBtn("MODE FREEZE", 0, rowY, function() callL4("setFreeze") end)
+mkBtn("TURUN 250",   1, rowY, function() callL4("moveDown") end)
 rowY = rowY + 38
-mkBtn("NAIK 250", 0, function() callL4("moveUp") end).Position = UDim2.new(0, 5, 0, rowY)
-mkBtn("BALIK KE ATAS", 1, function() callL4("goBack") end).Position = UDim2.new(0.5, 0, 0, rowY)
+mkBtn("NAIK 250",    0, rowY, function() callL4("moveUp")    end)
+mkBtn("BALIK KE ATAS", 1, rowY, function() callL4("goBack")  end)
 
 -- ================= TAB: LOG =================
 local logPage = addTab("LOG")

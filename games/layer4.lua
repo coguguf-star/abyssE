@@ -1,29 +1,27 @@
 -- ============================================
--- AbyssE - layer4.lua  (modul EXPLORE LAYER 4)
--- ON -> M.start()  |  OFF -> M.stop()
+-- AbyssE - layer4.lua
 -- ============================================
 
-local Players = game:GetService("Players")
-local RS      = game:GetService("RunService")
-local PLR     = Players.LocalPlayer
-local LOG     = getgenv().ABYSS_LOG or function(m) print("[L4] "..tostring(m)) end
+local Players    = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local plr        = Players.LocalPlayer
+local LOG        = getgenv().ABYSS_LOG or function(m) print("[L4] " .. tostring(m)) end
 
 local M = {}
 M.loaded = true
 getgenv().ABYSS_LAYER4 = M
 
-local FLY_SPEED = 90
+local FLY_SPEED  = 90
 local WALK_SPEED = 50
-local STEP = 250
+local STEP       = 250
+local MAX_FALL   = 60
 
 local running = false
-local mode = "FREEZE"
-local conn = nil
-local savedCF = nil
-local lastY = nil
+local mode    = "FREEZE"
+local conn, charAddedConn, savedCF, lowestY
 
 local function char()
-    local c = PLR.Character
+    local c = plr.Character
     if not c then return nil end
     local h = c:FindFirstChildOfClass("Humanoid")
     local r = c:FindFirstChild("HumanoidRootPart")
@@ -36,8 +34,8 @@ local function applyMode()
     if not r then return end
     if mode == "WALK" then
         r.Anchored = false
-        h.WalkSpeed = WALK_SPEED
-        lastY = r.Position.Y
+        if h then h.WalkSpeed = WALK_SPEED end
+        lowestY = r.Position.Y
     else
         r.Anchored = true
         if h then h.WalkSpeed = 16 end
@@ -45,53 +43,59 @@ local function applyMode()
 end
 
 function M.isRunning() return running end
+function M.getMode()    return mode    end
 
 function M.setFly()    mode = "FLY";    applyMode(); LOG("[L4] mode FLY")    end
 function M.setWalk()   mode = "WALK";   applyMode(); LOG("[L4] mode WALK")   end
 function M.setFreeze() mode = "FREEZE"; applyMode(); LOG("[L4] mode FREEZE") end
 
-function M.moveDown()
-    local _, _, r = char(); if not r then return end
-    local p = r.Position - Vector3.new(0, STEP, 0)
-    pcall(function() PLR:RequestStreamAroundAsync(p) end)
-    task.wait(0.2)
+-- FIX: selalu anchor saat pindah, apapun modenya, biar ga ditarik gravitasi
+local function shift(dy, label)
+    local _, _, r = char()
+    if not r then LOG("[L4] karakter belum ada"); return end
+    local wasWalk = (mode == "WALK")
+    r.Anchored = true
+    local p = r.Position + Vector3.new(0, dy, 0)
+    pcall(function() plr:RequestStreamAroundAsync(p) end)
+    task.wait(0.15)
     r.CFrame = CFrame.new(p)
-    LOG("[L4] turun -> Y " .. math.floor(p.Y))
+    lowestY = p.Y
+    if wasWalk then r.Anchored = false end
+    LOG(("[L4] %s %.0f -> Y %.0f"):format(label, math.abs(dy), p.Y))
 end
 
-function M.moveUp()
-    local _, _, r = char(); if not r then return end
-    local p = r.Position + Vector3.new(0, STEP, 0)
-    pcall(function() PLR:RequestStreamAroundAsync(p) end)
-    task.wait(0.2)
-    r.CFrame = CFrame.new(p)
-    LOG("[L4] naik -> Y " .. math.floor(p.Y))
-end
+function M.moveDown()    shift(-STEP,     "turun") end
+function M.moveUp()      shift( STEP,     "naik")  end
+function M.moveDownBig() shift(-STEP * 4, "turun") end
+function M.moveUpBig()   shift( STEP * 4, "naik")  end
 
 function M.goBack()
-    local _, _, r = char(); if not r then return end
-    if not savedCF then return end
-    pcall(function() PLR:RequestStreamAroundAsync(savedCF.Position) end)
-    task.wait(0.2)
+    local _, _, r = char()
+    if not r or not savedCF then LOG("[L4] posisi awal belum kesimpen"); return end
+    r.Anchored = true
+    pcall(function() plr:RequestStreamAroundAsync(savedCF.Position) end)
+    task.wait(0.15)
     r.CFrame = savedCF
+    lowestY = savedCF.Position.Y
+    if mode == "WALK" then r.Anchored = false end
     LOG("[L4] balik ke posisi awal.")
 end
 
 function M.start()
     if running then return end
-    local _, h, r = char()
+    local _, _, r = char()
     if not r then LOG("[L4] Character belum spawn."); return end
 
     savedCF = r.CFrame
     running = true
     mode = "FLY"
     applyMode()
-    LOG("[L4] ON - FLY aktif. Pakai TURUN buat masuk Layer 4, analog buat gerak.")
+    LOG("[L4] ON - FLY aktif. Analog buat gerak, tombol TURUN buat masuk Layer 4.")
 
-    conn = RS.RenderStepped:Connect(function(dt)
+    conn = RunService.RenderStepped:Connect(function(dt)
         if not running then return end
         local _, hum, root = char()
-        if not root then return end
+        if not root or not hum then return end
 
         if mode == "FLY" then
             local dir = hum.MoveDirection
@@ -100,16 +104,21 @@ function M.start()
             end
         elseif mode == "WALK" then
             local v = root.AssemblyLinearVelocity
-            if v.Y < -60 then
-                root.AssemblyLinearVelocity = Vector3.new(v.X, -60, v.Z)
+            if v.Y < -MAX_FALL then
+                root.AssemblyLinearVelocity = Vector3.new(v.X, -MAX_FALL, v.Z)
             end
-            if lastY and root.Position.Y < lastY - 300 then
+            if lowestY and root.Position.Y < lowestY - 300 then
                 mode = "FREEZE"
                 applyMode()
-                LOG("[L4] jatuh > 300, di-FREEZE. Tekan FLY buat lanjut.")
+                LOG("[L4] jatuh > 300 stud, di-FREEZE. Tekan FLY buat lanjut.")
             end
-            lastY = math.max(lastY or root.Position.Y, root.Position.Y)
+            lowestY = math.min(lowestY or root.Position.Y, root.Position.Y)
         end
+    end)
+
+    charAddedConn = plr.CharacterAdded:Connect(function()
+        task.wait(1.5)
+        if running then applyMode() end
     end)
 end
 
@@ -117,6 +126,7 @@ function M.stop()
     if not running then return end
     running = false
     if conn then pcall(function() conn:Disconnect() end); conn = nil end
+    if charAddedConn then pcall(function() charAddedConn:Disconnect() end); charAddedConn = nil end
     local _, h, r = char()
     if h then pcall(function() h.WalkSpeed = 16 end) end
     if r then pcall(function() r.Anchored = false end) end

@@ -1,6 +1,6 @@
 -- ============================================
--- AbyssE - menu.lua  (FINAL)
--- Menu draggable + animasi + server hop
+-- AbyssE - menu.lua  (FINAL + FARM/ANCHOR)
+-- Menu draggable + animasi + server hop + auto farm
 -- ============================================
 
 local Players  = game:GetService("Players")
@@ -16,8 +16,10 @@ local PGUI = PLR:WaitForChild("PlayerGui")
 local BASE = getgenv().ABYSS_BASE or "https://raw.githubusercontent.com/coguguf-star/AbyssE/main/games/"
 
 if getgenv().ABYSS_MENU_GUI then pcall(function() getgenv().ABYSS_MENU_GUI:Destroy() end) end
+if getgenv().ABYSS_FARM   and getgenv().ABYSS_FARM.stop   then pcall(getgenv().ABYSS_FARM.stop) end
 if getgenv().ABYSS_TRIP   and getgenv().ABYSS_TRIP.stop   then pcall(getgenv().ABYSS_TRIP.stop) end
 if getgenv().ABYSS_LAYER4 and getgenv().ABYSS_LAYER4.stop then pcall(getgenv().ABYSS_LAYER4.stop) end
+if getgenv().ABYSS_ANCHOR and getgenv().ABYSS_ANCHOR.set  then pcall(getgenv().ABYSS_ANCHOR.set, false) end
 
 local C = {
     bg    = Color3.fromRGB(16,17,22),
@@ -74,8 +76,8 @@ local gui = mk("ScreenGui", {
 getgenv().ABYSS_MENU_GUI = gui
 
 local main = mk("Frame", {
-    Size = UDim2.new(0, 320, 0, 430),
-    Position = UDim2.new(1, -332, 0, 80),
+    Size = UDim2.new(0, 340, 0, 430),
+    Position = UDim2.new(1, -352, 0, 80),
     BackgroundColor3 = C.bg, BorderSizePixel = 0,
 }, gui)
 mk("UICorner", { CornerRadius = UDim.new(0, 12) }, main)
@@ -125,8 +127,8 @@ local pages = {}
 
 local function addTab(name)
     local btn = mk("TextButton", {
-        Size = UDim2.new(0.2, -4, 1, 0), BackgroundColor3 = C.off,
-        Text = name, Font = Enum.Font.GothamBold, TextSize = 11,
+        Size = UDim2.new(1/6, -4, 1, 0), BackgroundColor3 = C.off,
+        Text = name, Font = Enum.Font.GothamBold, TextSize = 10,
         TextColor3 = C.txt, BorderSizePixel = 0,
     }, tabBar)
     mk("UICorner", { CornerRadius = UDim.new(0, 6) }, btn)
@@ -202,7 +204,7 @@ local mini = mk("TextButton", {
 mk("UICorner", { CornerRadius = UDim.new(0, 14) }, mini)
 local miniScale = mk("UIScale", { Scale = 1 }, mini)
 
--- FIX: forward declare dulu, baru dipakai di closure bawah
+-- forward declare dulu, baru dipakai di closure bawah
 local openMain, closeMain
 
 makeDraggable(mini, mini, function() openMain() end)
@@ -307,7 +309,7 @@ local function ensureModule(file, key)
     return getgenv()[key]
 end
 
-local tripVisual, l4Visual
+local tripVisual, l4Visual, farmVisual, anchorVisual
 
 local function setTrip(on)
     if on then
@@ -326,6 +328,33 @@ local function setL4(on)
     else
         local m = getgenv().ABYSS_LAYER4
         if m and m.stop then m.stop() end
+    end
+end
+
+local function setAnchor(on)
+    if on then
+        local m = ensureModule("anchor", "ABYSS_ANCHOR")
+        if m and m.set then m.set(true) else if anchorVisual then anchorVisual(false) end end
+    else
+        local m = getgenv().ABYSS_ANCHOR
+        if m and m.set then m.set(false) end
+    end
+end
+
+local function setFarm(on)
+    if on then
+        local a = ensureModule("anchor", "ABYSS_ANCHOR")
+        local t = ensureModule("abyss",  "ABYSS_TRIP")
+        local f = ensureModule("farm",   "ABYSS_FARM")
+        if a and t and f and f.start then
+            f.start()
+        else
+            LOG("[FARM] modul belum lengkap (anchor/abyss/farm)")
+            if farmVisual then farmVisual(false) end
+        end
+    else
+        local f = getgenv().ABYSS_FARM
+        if f and f.stop then f.stop() end
     end
 end
 
@@ -394,6 +423,38 @@ local function makeToggle(parent, y, text, onChanged)
     return btn, function(v) state = v; paint() end
 end
 
+-- ================= TAB: FARM =================
+local farm = addTab("FARM")
+local farmScroll = mk("ScrollingFrame", {
+    Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
+    BorderSizePixel = 0, ScrollBarThickness = 3, CanvasSize = UDim2.new(0, 0, 0, 330),
+}, farm)
+
+local _, setFarmVis = makeToggle(farmScroll, 6, "AUTO FARM (AFK)", setFarm)
+farmVisual = setFarmVis
+
+local _, setAnchorVis = makeToggle(farmScroll, 50, "ANCHOR", setAnchor)
+anchorVisual = setAnchorVis
+
+local farmStatus = mk("TextLabel", {
+    Size = UDim2.new(1, -10, 0, 46), Position = UDim2.new(0, 5, 0, 96),
+    BackgroundColor3 = C.panel, BorderSizePixel = 0,
+    Text = "  FASE   : -\n  SIKLUS : 0",
+    Font = Enum.Font.Code, TextSize = 12, TextColor3 = C.txt,
+    TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Center,
+}, farmScroll)
+mk("UICorner", { CornerRadius = UDim.new(0, 8) }, farmStatus)
+
+sectionLabel(farmScroll, 148, "ALUR")
+local farmNote = mk("TextLabel", {
+    Size = UDim2.new(1, -10, 0, 150), Position = UDim2.new(0, 5, 0, 170),
+    BackgroundColor3 = C.panel, BorderSizePixel = 0, TextWrapped = true,
+    Text = "  ANCHOR ON > AUTO TRIP turun > nyampe dasar tunggu 1-3 dtk > ANCHOR OFF > tunggu 5-7 dtk > RESPAWN > ulang.\n\n  Kalau mati di tengah jalan, trip lanjut dari titik terdekat & anchor nyala lagi sendiri.\n\n  Tombol ANCHOR bisa dipake manual juga. Waktu bisa diubah di farm.lua (CFG).",
+    Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = C.dim,
+    TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
+}, farmScroll)
+mk("UICorner", { CornerRadius = UDim.new(0, 8) }, farmNote)
+
 -- ================= TAB: TRIP =================
 local trip = addTab("TRIP")
 local tripScroll = mk("ScrollingFrame", {
@@ -413,7 +474,7 @@ sectionLabel(tripScroll, 96, "CATATAN")
 local tripNote = mk("TextLabel", {
     Size = UDim2.new(1, -10, 0, 130), Position = UDim2.new(0, 5, 0, 118),
     BackgroundColor3 = C.panel, BorderSizePixel = 0, TextWrapped = true,
-    Text = "  Modul jalan sendiri ngikutin jalur rekaman.\n  Pas nyampe tali, snake mati & nunggu lu pakai tali manual (hold 0.5-1 dtk).\n  Kalau lu udah turun, tekan LANJUT.\n\n  Kalau mati, dia otomatis mulai dari titik terdekat.",
+    Text = "  Modul jalan sendiri ngikutin jalur rekaman.\n  Jalur baru ga lewat tali, jadi tombol LANJUT cuma cadangan.\n\n  Kalau mati, dia otomatis mulai dari titik terdekat.\n  Mau AFK? pakai tab FARM (ada anchor + respawn otomatis).",
     Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = C.dim,
     TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
 }, tripScroll)
@@ -597,12 +658,24 @@ showTab("PROFIL")
 openMain()
 LOG("Menu AbyssE siap.")
 
+-- sinkron tampilan toggle dengan kondisi modul yang sebenarnya
 task.spawn(function()
     while gui.Parent do
         task.wait(0.5)
+
         local t = getgenv().ABYSS_TRIP
-        if t and t.isRunning and not t.isRunning() and tripVisual then tripVisual(false) end
+        if t and t.isRunning and tripVisual then tripVisual(t.isRunning()) end
+
         local l = getgenv().ABYSS_LAYER4
         if l and l.isRunning and not l.isRunning() and l4Visual then l4Visual(false) end
+
+        local a = getgenv().ABYSS_ANCHOR
+        if a and a.isOn and anchorVisual then anchorVisual(a.isOn()) end
+
+        local f = getgenv().ABYSS_FARM
+        if f and f.isRunning then
+            if farmVisual then farmVisual(f.isRunning()) end
+            farmStatus.Text = string.format("  FASE   : %s\n  SIKLUS : %d", f.getPhase(), f.getCycles())
+        end
     end
 end)

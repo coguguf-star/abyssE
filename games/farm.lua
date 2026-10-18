@@ -23,6 +23,9 @@ local CFG = {
     RESPAWN_TIMEOUT = 30,         -- batas nunggu karakter baru
     SETTLE          = 1.5,        -- jeda setelah respawn sebelum mulai lagi
     MAX_TRIP        = 600,        -- batas aman satu kali turun (10 menit)
+    WALK_TARGET     = Vector3.new(-155, -2093, -74), -- titik trigger poin
+    WALK_RADIUS     = 3.5,        -- dianggap sampai kalau jarak (XZ) <= ini
+    WALK_TIMEOUT    = 20,         -- batas nunggu jalan ke titik (detik)
 }
 -- =================================
 
@@ -67,6 +70,22 @@ local function waitAlive(id, timeout, notChar)
         if c and h.Health > 0 and c ~= notChar then return true end
         task.wait(0.25)
         t = t + 0.25
+    end
+    return false
+end
+
+-- jalan (Humanoid:MoveTo) ke target, true kalau sampai
+local function walkTo(id, target)
+    local t = 0
+    while t < CFG.WALK_TIMEOUT do
+        if not alive(id) then return false end
+        local _, h, r = rig()
+        if not h or h.Health <= 0 then return false end
+        local d = Vector3.new(r.Position.X - target.X, 0, r.Position.Z - target.Z).Magnitude
+        if d <= CFG.WALK_RADIUS then return true end
+        h:MoveTo(target)
+        task.wait(0.5)
+        t = t + 0.5
     end
     return false
 end
@@ -118,12 +137,21 @@ local function cycle(id)
     LOG(("[FARM] di dasar, tunggu %.1f dtk"):format(w1))
     if not sleep(w1, id) then return end
 
-    -- 5. lepas anchor, tunggu lagi
+    -- 5. lepas anchor, jalan ke titik poin, baru tunggu
     phase = "ANCHOR OFF"
     local bottomChar = plr.Character
     anchor.set(false)
+    if not sleep(0.5, id) then return end
+
+    phase = "JALAN KE POIN"
+    local reached = walkTo(id, CFG.WALK_TARGET)
+    if not alive(id) then return end
+    LOG(reached and "[FARM] sampai di titik poin"
+                 or "[FARM] ga nyampe titik poin (timeout), lanjut")
+
+    phase = "NUNGGU RESPAWN"
     local w2 = rand(CFG.UNANCHOR_WAIT)
-    LOG(("[FARM] anchor off, respawn %.1f dtk lagi"):format(w2))
+    LOG(("[FARM] respawn %.1f dtk lagi"):format(w2))
     if not sleep(w2, id) then return end
 
     -- 6. respawn
